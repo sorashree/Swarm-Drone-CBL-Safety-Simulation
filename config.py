@@ -76,8 +76,8 @@ LEADER_CENTER = np.array(
 # INITIAL CONDITIONS
 # ============================================================
 
-INITIAL_POSITION_NOISE = 0.70
-INITIAL_VELOCITY_NOISE = 0.25
+INITIAL_POSITION_NOISE = 0.15
+INITIAL_VELOCITY_NOISE = 0.10
 
 
 # ============================================================
