@@ -127,11 +127,13 @@ def pairwise_constraint_row(
 
         -constant_term
 
-        - config.CBF_ALPHA1 *
-        h_dot
+        - (
+            config.CBF_ALPHA1 + config.CBF_ALPHA2
+        )* h_dot
 
-        - config.CBF_ALPHA0 *
-        h
+        - (
+            config.CBF_ALPHA1 * config.CBF_ALPHA2
+        ) * h
     )
 
 
@@ -258,7 +260,8 @@ def cbf_filter(
     # --------------------------------
 
     max_acceleration = (
-        config.MAX_ACCELERATION
+        config.MAX_ACCELERATION /
+        np.sqrt(2.0)
     )
 
 
