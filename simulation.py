@@ -35,73 +35,85 @@ from metrics import (
 
 
 def create_initial_drones():
-
     """
-    Create drones with small initial errors.
+    Initialise UAVs at scattered positions around
+    the virtual leader with zero initial velocity.
     """
 
-    rng = np.random.default_rng(
-        config.SEED
-    )
-
-
-    (
-        desired_positions,
-        desired_velocities,
-        _,
-        _,
-        _
-    ) = desired_formation(0.0)
-
+    rng = np.random.default_rng(config.SEED)
 
     drones = []
 
+    base_angles = np.linspace(
+        0.0,
+        2.0 * np.pi,
+        config.NUM_DRONES,
+        endpoint=False
+    )
 
-    for i in range(
+    angle_variations = rng.uniform(
+        -0.18,
+        0.18,
         config.NUM_DRONES
-    ):
+    )
 
-        position = (
+    starting_radii = rng.uniform(
+        4.5,
+        5.2,
+        config.NUM_DRONES
+    )
 
-            desired_positions[i]
+    starting_positions = []
 
-            + rng.normal(
-                0.0,
-                config.INITIAL_POSITION_NOISE,
-                size=2
-            )
+    for i in range(config.NUM_DRONES):
+
+        angle = (
+            base_angles[i]
+            + angle_variations[i]
         )
 
+        radius = starting_radii[i]
 
-        velocity = (
+        position = np.array([
+            radius * np.cos(angle),
+            radius * np.sin(angle)
+        ])
 
-            desired_velocities[i]
+        starting_positions.append(position)
 
-            + rng.normal(
-                0.0,
-                config.INITIAL_VELOCITY_NOISE,
-                size=2
+    # Validate initial separation.
+    for i in range(config.NUM_DRONES):
+
+        for j in range(i + 1, config.NUM_DRONES):
+
+            distance = np.linalg.norm(
+                starting_positions[i]
+                - starting_positions[j]
             )
-        )
 
+            if distance < config.SAFETY_DISTANCE:
+
+                raise ValueError(
+                    f"Initial separation violation: "
+                    f"UAV {i + 1} and UAV {j + 1}: "
+                    f"{distance:.3f} m"
+                )
+
+    for i in range(config.NUM_DRONES):
 
         drones.append(
-
             Drone(
-
                 drone_id=i,
-
-                position=position,
-
-                velocity=velocity
+                position=starting_positions[i],
+                velocity=np.zeros(2)
             )
         )
-
 
     return drones
 
 
-def run_simulation():
+
+def run_simulation(use_cbf=True):
 
     """
     Run complete swarm simulation.
@@ -156,6 +168,8 @@ def run_simulation():
     cbf_active_history = []
 
     cbf_success_history = []
+
+    cbf_intervention_history = []
 
 
     # =================================
@@ -226,17 +240,26 @@ def run_simulation():
         # CBF safety filter
         # --------------------------------
 
-        (
-            safe_controls,
-            cbf_info
-        ) = cbf_filter(
+        if use_cbf:
 
-            positions,
+            (
+                safe_controls,
+                cbf_info
+            ) = cbf_filter(
 
-            velocities,
+                positions,
 
-            nominal
-        )
+                velocities,
+
+                nominal
+            )
+
+        else:
+
+            # Baseline: use nominal controller directly.
+            safe_controls = nominal.copy()
+
+            cbf_info = None
 
 
         # --------------------------------
@@ -293,20 +316,41 @@ def run_simulation():
         )
 
 
-        cbf_active_history.append(
+        if use_cbf:
 
-            cbf_info[
-                "active_or_near_cbf_constraints"
-            ]
-        )
+            cbf_active_history.append(
+                cbf_info["active_or_near_cbf_constraints"]
+            )
+
+            cbf_success_history.append(
+                cbf_info["qp_success"]
+            )
+
+        else:
+
+            # NaN means the CBF/QP was not run.
+            cbf_active_history.append(np.nan)
+            cbf_success_history.append(np.nan)
 
 
-        cbf_success_history.append(
+        if use_cbf:
 
-            cbf_info[
-                "qp_success"
-            ]
-        )
+            # Fraction of drones whose commands were changed by CBF.
+            changed = (
+                np.linalg.norm(
+                    safe_controls - nominal,
+                    axis=1
+                ) > 1e-6
+            )
+
+            cbf_intervention_history.append(
+                float(np.mean(changed))
+            )
+
+        else:
+
+            # CBF was not executed: intervention is not applicable.
+            cbf_intervention_history.append(np.nan)
 
 
         # --------------------------------
@@ -409,5 +453,11 @@ def run_simulation():
 
         "degree": D,
 
-        "laplacian": L
+        "laplacian": L,
+
+        "cbf_intervention_fraction": np.asarray(
+            cbf_intervention_history
+        ),
+
+        "cbf_enabled": bool(use_cbf)
     }
