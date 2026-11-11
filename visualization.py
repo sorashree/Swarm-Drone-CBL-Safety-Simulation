@@ -32,12 +32,7 @@ from matplotlib.lines import Line2D
 # FFmpeg configuration
 # ============================================================
 
-mpl.rcParams["animation.ffmpeg_path"] = (
-    r"C:\Users\Shreeya Mukherjee\AppData\Local\Microsoft\WinGet\Packages"
-    r"\Gyan.FFmpeg.Shared_Microsoft.Winget.Source_8wekyb3d8bbwe"
-    r"\ffmpeg-9.0.2-full_build-shared"
-    r"\bin\ffmpeg.exe"
-)
+mpl.rcParams["animation.ffmpeg_path"] = "ffmpeg"
 
 
 # ============================================================
@@ -396,8 +391,10 @@ def create_animation(data):
     # ========================================================
 
     fig, ax = plt.subplots(
-        figsize=(9, 8)
+        figsize=(16, 9),
+        facecolor="#FFFFFF"
     )
+    ax.set_facecolor("#F5F7FA")
 
     ax.set_title(
         "Distributed Swarm-Drone Formation Control "
@@ -509,7 +506,7 @@ def create_animation(data):
         line, = ax.plot(
             [],
             [],
-            linestyle="-",
+            linestyle="--",
             linewidth=0.8,
             alpha=0.30,
             zorder=3
@@ -543,6 +540,20 @@ def create_animation(data):
         drones.append(
             drone
         )
+    #Individual UAV trajectory trails 
+    trail_lines=[]
+    for i in range(num_drones):
+        trail,=ax.plot(
+            [],
+            [],
+            color=f"#6685A3",
+            linewidth=1.2,
+            alpha=0.45,
+            zorder=2,
+            
+        )
+        trail_lines.append(trail)
+    trail_length=60
 
     # ========================================================
     # Virtual leader marker
@@ -631,9 +642,12 @@ def create_animation(data):
     cbf_box = ax.text(
         0.98,
         0.02,
-        r"$h_{ij}=\|p_i-p_j\|^2-d^2\geq0$"
+        r"$h_{ij}=\|p_i-p_j\|^2-d_s^2$"
         "\n"
-        r"$\dot h+\alpha h\geq0$",
+        r"$\ddot h_{ij}+(\alpha_1+\alpha_2)\dot h_{ij}$"
+        "\n"
+        r"$+\alpha_1\alpha_2h_{ij}\geq0$",
+
         transform=ax.transAxes,
         verticalalignment="bottom",
         horizontalalignment="right",
@@ -715,6 +729,10 @@ def create_animation(data):
         current_positions = (
             positions[frame]
         )
+
+        #Update individual UAV trajectories 
+        for trail in trail_lines:
+            trail.set_data([],[])
 
         current_velocities = (
             velocities[frame]
@@ -824,7 +842,7 @@ def create_animation(data):
             f"{time[frame]:.2f} s\n"
             f"RMS formation error: "
             f"{current_rms:.3f} m\n"
-            f"Minimum separation: "
+            f"Current Minimum separation: "
             f"{current_min_sep:.3f} m\n"
             f"Safety threshold: "
             f"{safety_distance:.2f} m\n"
@@ -837,13 +855,24 @@ def create_animation(data):
     # ========================================================
     # Create animation
     # ========================================================
+    target_duration = 20
+    fps = 20
+    total_output_frames = target_duration * fps
+    frame_step = max(1, (num_frames - 1) // (total_output_frames - 1))
+    frame_indices = list(
+    range(0, num_frames, frame_step)
+    )
+    if frame_indices[-1] != num_frames - 1:
+        frame_indices.append(num_frames - 1)
+    if frame_indices[-1]!=num_frames-1:
+        frame_indices.append(num_frames-1)
 
     animation = FuncAnimation(
         fig,
         update,
         init_func=init,
-        frames=num_frames,
-        interval=20,
+        frames=frame_indices,
+        interval=50,
         blit=False,
         repeat=False
     )
@@ -862,12 +891,12 @@ def create_animation(data):
     # ========================================================
 
     writer = FFMpegWriter(
-        fps=30,
+        fps=20,
         metadata={
-            "title":
-                "8-Drone Distributed Formation Control"
+            "title":  "8-Drone Distributed Formation Control",
+            "artist": "Swarm Robotics Simulation"
         },
-        bitrate=2500
+        bitrate=5000
     )
 
     # ========================================================
@@ -939,8 +968,10 @@ def create_result_plot(data):
     # ========================================================
 
     fig, ax = plt.subplots(
-        figsize=(10, 8)
+        figsize=(16, 9),
+        facecolor="#FFFFFF"
     )
+    ax.set_facecolor("#F5F7FA")
 
     ax.set_title(
         "8-Drone Distributed Formation Control "
@@ -1004,6 +1035,7 @@ def create_result_plot(data):
                 final_positions[i, 1],
                 final_positions[j, 1]
             ],
+            linestyle="--",
             linewidth=0.9,
             alpha=0.30,
             zorder=2
